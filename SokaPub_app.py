@@ -1,24 +1,23 @@
+import streamlit as st
 import pandas as pd
 from Bio import Entrez
-import streamlit as st
 
-# Set your email for NCBI Entrez (required by NCBI)
+# Set Entrez email
 Entrez.email = 'adegbesamson@gmail.com'
 
-# Helper function to parse publication date
+# Helper: parse publication date
 def parse_pub_date(pub_date):
     year = pub_date.get('Year', 'Unknown')
     month = pub_date.get('Month', '01')
     day = pub_date.get('Day', '01')
     return f"{year}-{month}-{day}"
 
-# Function to search PubMed
+# Function: PubMed search
 def search_pubmed(query, db="pubmed"):
     try:
         handle = Entrez.esearch(db=db, term=query, retmax=50)
         record = Entrez.read(handle)
         id_list = record.get('IdList', [])
-
         if not id_list:
             return pd.DataFrame()
 
@@ -43,8 +42,8 @@ def search_pubmed(query, db="pubmed"):
                         'Abstract': abstract,
                         'Authors': authors_list,
                         'Journal': journal,
-                        'Publication Date': pub_date,
-                        'URL': url
+                        'URL': url,
+                        'Publication Date': pub_date
                     })
             except Exception:
                 continue
@@ -52,20 +51,39 @@ def search_pubmed(query, db="pubmed"):
     except Exception:
         return pd.DataFrame()
 
-# Streamlit UI
-st.title("PubMed Literature Search")
+# Streamlit Interface
+st.title("PubMed Boolean Search Tool")
 
-# Text input for dynamic PubMed query
-query = st.text_input("Enter your PubMed search query", value='"Africa"[All Fields] AND "genomic"[All Fields]')
+# Search input sections
+st.subheader("Build Your Query")
 
+field_map = {
+    "All Fields": "All Fields",
+    "Title": "Title",
+    "Author": "Author",
+    "Abstract": "Abstract",
+    "Journal": "Journal"
+}
+
+# Query parts
+keyword1 = st.text_input("Keyword 1", "Africa")
+field1 = st.selectbox("Field for Keyword 1", list(field_map.keys()))
+
+bool_operator = st.selectbox("Boolean Operator", ["AND", "OR", "NOT"])
+
+keyword2 = st.text_input("Keyword 2", "genomic")
+field2 = st.selectbox("Field for Keyword 2", list(field_map.keys()))
+
+# Execute search
 if st.button("Search"):
-    if query.strip():
-        st.info(f"Running query: {query}")
-        df = search_pubmed(query)
-        if not df.empty:
-            st.success(f"Found {len(df)} results")
-            st.dataframe(df)
-        else:
-            st.warning("No results found.")
+    query = f'"{keyword1}"[{field_map[field1]}] {bool_operator} "{keyword2}"[{field_map[field2]}]'
+    st.write(f"**Formatted Query:** `{query}`")
+
+    results = search_pubmed(query)
+    if not results.empty:
+        st.success(f"✅ Found {len(results)} results")
+        st.dataframe(results)
+        results.to_excel("Broad_Search_Results.xlsx", index=False)
+        st.download_button("Download Results as Excel", data=results.to_csv(index=False), file_name="pubmed_results.csv")
     else:
-        st.warning("Please enter a search query.")
+        st.warning("No results found.")
