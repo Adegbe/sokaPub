@@ -1,9 +1,8 @@
 import pandas as pd
-import streamlit as st
 from Bio import Entrez
-import urllib.error
+import streamlit as st
 
-# Set your email for Entrez access
+# Set your email for NCBI Entrez (required by NCBI)
 Entrez.email = 'adegbesamson@gmail.com'
 
 # Helper function to parse publication date
@@ -13,7 +12,7 @@ def parse_pub_date(pub_date):
     day = pub_date.get('Day', '01')
     return f"{year}-{month}-{day}"
 
-# Function to search PubMed or PMC
+# Function to search PubMed
 def search_pubmed(query, db="pubmed"):
     try:
         handle = Entrez.esearch(db=db, term=query, retmax=50)
@@ -44,8 +43,8 @@ def search_pubmed(query, db="pubmed"):
                         'Abstract': abstract,
                         'Authors': authors_list,
                         'Journal': journal,
-                        'URL': url,
-                        'Publication Date': pub_date
+                        'Publication Date': pub_date,
+                        'URL': url
                     })
             except Exception:
                 continue
@@ -54,22 +53,19 @@ def search_pubmed(query, db="pubmed"):
         return pd.DataFrame()
 
 # Streamlit UI
-st.title("PubMed/PMC Literature Search")
-queries = [
-    '"Olono"[All Fields]',
-    '"genomic capacity"[All Fields] AND "precision health"[All Fields]',
-    '"Africa"[All Fields] AND "genomic"[All Fields]',
-]
+st.title("PubMed Literature Search")
 
-selected_query = st.selectbox("Select a query to run:", queries)
+# Text input for dynamic PubMed query
+query = st.text_input("Enter your PubMed search query", value='"Africa"[All Fields] AND "genomic"[All Fields]')
 
 if st.button("Search"):
-    with st.spinner("Searching PubMed..."):
-        df = search_pubmed(selected_query)
-        if df.empty:
-            st.warning("No results found.")
+    if query.strip():
+        st.info(f"Running query: {query}")
+        df = search_pubmed(query)
+        if not df.empty:
+            st.success(f"Found {len(df)} results")
+            st.dataframe(df)
         else:
-            st.success(f"Found {len(df)} articles.")
-            st.dataframe(df[['Title', 'Authors', 'Journal', 'Publication Date', 'URL']])
-            csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button("Download results as CSV", csv, "search_results.csv", "text/csv")
+            st.warning("No results found.")
+    else:
+        st.warning("Please enter a search query.")
