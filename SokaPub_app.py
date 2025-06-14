@@ -1,6 +1,10 @@
 import pandas as pd
+import streamlit as st
 from Bio import Entrez
 import urllib.error
+
+# Set your email for Entrez access
+Entrez.email = 'adegbesamson@gmail.com'
 
 # Helper function to parse publication date
 def parse_pub_date(pub_date):
@@ -9,9 +13,7 @@ def parse_pub_date(pub_date):
     day = pub_date.get('Day', '01')
     return f"{year}-{month}-{day}"
 
-# Set email for NCBI Entrez
-Entrez.email = 'adegbesamson@gmail.com'
-
+# Function to search PubMed or PMC
 def search_pubmed(query, db="pubmed"):
     try:
         handle = Entrez.esearch(db=db, term=query, retmax=50)
@@ -51,24 +53,23 @@ def search_pubmed(query, db="pubmed"):
     except Exception:
         return pd.DataFrame()
 
+# Streamlit UI
+st.title("PubMed/PMC Literature Search")
 queries = [
     '"Olono"[All Fields]',
     '"genomic capacity"[All Fields] AND "precision health"[All Fields]',
     '"Africa"[All Fields] AND "genomic"[All Fields]',
 ]
 
-results = pd.DataFrame()
-for query in queries:
-    df_pubmed = search_pubmed(query, db="pubmed")
-    results = pd.concat([results, df_pubmed], ignore_index=True)
-    if df_pubmed.empty:
-        df_pmc = search_pubmed(query, db="pmc")
-        results = pd.concat([results, df_pmc], ignore_index=True)
+selected_query = st.selectbox("Select a query to run:", queries)
 
-results.drop_duplicates(subset='PMID', inplace=True)
-
-if not results.empty:
-    results.to_excel("Broad_Search_Results.xlsx", index=False)
-    print("Results saved to Broad_Search_Results.xlsx")
-else:
-    print("No results found.")
+if st.button("Search"):
+    with st.spinner("Searching PubMed..."):
+        df = search_pubmed(selected_query)
+        if df.empty:
+            st.warning("No results found.")
+        else:
+            st.success(f"Found {len(df)} articles.")
+            st.dataframe(df[['Title', 'Authors', 'Journal', 'Publication Date', 'URL']])
+            csv = df.to_csv(index=False).encode('utf-8')
+            st.download_button("Download results as CSV", csv, "search_results.csv", "text/csv")
